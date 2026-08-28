@@ -1,0 +1,98 @@
+{
+  "entities": {
+    "Dataset": {
+      "title": "Dataset",
+      "description": "Uploaded dataset specification and contents",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the dataset"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the uploaded file"
+        },
+        "uploadedAt": {
+          "type": "string",
+          "description": "ISO date string when the dataset was uploaded"
+        },
+        "rowCount": {
+          "type": "integer",
+          "description": "Total number of rows in the dataset"
+        },
+        "columns": {
+          "type": "array",
+          "description": "Column headers of the dataset"
+        },
+        "fileSize": {
+          "type": "string",
+          "description": "Formatted file size"
+        },
+        "rawData": {
+          "type": "array",
+          "description": "Raw JSON array representing row objects"
+        }
+      },
+      "required": ["id", "name", "uploadedAt", "rowCount", "columns", "fileSize"]
+    },
+    "QueryItem": {
+      "title": "QueryItem",
+      "description": "Saved analytical questions and corresponding Gemini answers",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the query item"
+        },
+        "datasetId": {
+          "type": "string",
+          "description": "ID of the dataset associated with this query"
+        },
+        "datasetName": {
+          "type": "string",
+          "description": "Name of the dataset associated with this query"
+        },
+        "question": {
+          "type": "string",
+          "description": "Human question asked by the user"
+        },
+        "sql": {
+          "type": "string",
+          "description": "The generated JSON/SQL instruction or script configuration"
+        },
+        "chartType": {
+          "type": "string",
+          "description": "The chart type selected for rendering"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Date and time of execution"
+        },
+        "explanation": {
+          "type": "string",
+          "description": "Descriptive narrative or findings from the query"
+        },
+        "result": {
+          "type": "array",
+          "description": "Resulting raw data rows of the query"
+        },
+        "analysis": {
+          "type": "object",
+          "description": "AI analysis model configuration and detailed results"
+        }
+      },
+      "required": ["id", "datasetId", "datasetName", "question", "sql", "chartType", "timestamp"]
+    }
+  },
+  "firestore": {
+    "users/{userId}/datasets/{datasetId}": {
+      "schema": "Dataset",
+      "description": "Collection of datasets uploaded by each individual user"
+    },
+    "users/{userId}/queries/{queryId}": {
+      "schema": "QueryItem",
+      "description": "Repository of analytical query runs and chart options"
+    }
+  }
+}

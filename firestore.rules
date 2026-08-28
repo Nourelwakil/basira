@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitive global helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return (request.auth != null && request.auth.uid == userId) || (userId is string && userId.matches('^guest_[a-zA-Z0-9_\\-]+$'));
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Structural Validations
+    function isValidDataset(data) {
+      return data.keys().hasAll(['id', 'name', 'uploadedAt', 'rowCount', 'columns', 'fileSize'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 256
+        && data.uploadedAt is string && data.uploadedAt.size() <= 64
+        && data.rowCount is int
+        && data.columns is list
+        && data.fileSize is string && data.fileSize.size() <= 64;
+    }
+
+    function isValidQuery(data) {
+      return data.keys().hasAll(['id', 'datasetId', 'datasetName', 'question', 'sql', 'chartType', 'timestamp'])
+        && data.id is string && data.id.size() <= 128
+        && data.datasetId is string && data.datasetId.size() <= 128
+        && data.datasetName is string && data.datasetName.size() <= 256
+        && data.question is string && data.question.size() <= 1024
+        && data.sql is string && data.sql.size() <= 8192
+        && data.chartType is string && data.chartType.size() <= 64
+        && data.timestamp is string && data.timestamp.size() <= 64;
+    }
+
+    // Collection rules matching path structures
+    match /users/{userId} {
+      allow get, write: if isOwner(userId);
+
+      match /datasets/{datasetId} {
+        allow get: if isOwner(userId) && isValidId(datasetId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(datasetId) && isValidDataset(incoming());
+        allow update: if isOwner(userId) && isValidId(datasetId) && isValidDataset(incoming()) 
+          && incoming().id == existing().id 
+          && incoming().uploadedAt == existing().uploadedAt;
+        allow delete: if isOwner(userId) && isValidId(datasetId);
+      }
+
+      match /queries/{queryId} {
+        allow get: if isOwner(userId) && isValidId(queryId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(queryId) && isValidQuery(incoming());
+        allow update: if isOwner(userId) && isValidId(queryId) && isValidQuery(incoming())
+          && incoming().id == existing().id
+          && incoming().timestamp == existing().timestamp;
+        allow delete: if isOwner(userId) && isValidId(queryId);
+      }
+    }
+  }
+}

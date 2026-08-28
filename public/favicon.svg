@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Brand eyebrow contour -->
+  <path d="M15 24 C30 11, 70 11, 85 24" stroke="#0F172A" stroke-width="4.5" stroke-linecap="round" />
+  <!-- Upper and lower lid curves -->
+  <path d="M15 48 C30 18, 70 18, 85 48" stroke="#0F172A" stroke-width="4.5" stroke-linecap="round" />
+  <path d="M15 48 C30 78, 70 78, 85 48" stroke="#0F172A" stroke-width="4.5" stroke-linecap="round" />
+  <!-- Royal Blue Pupil -->
+  <circle cx="50" cy="46" r="13" fill="#2563EB" />
+  <!-- Left teardrop marking -->
+  <path d="M41 59 L41 66 L35 78 L41 78 L41 88" stroke="#0F172A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Right dynamic spiral marking -->
+  <path d="M59 55 Q78 71 71 71 Q65 71 65 65 Q65 59 70 59 Q75 59 75 65" stroke="#0F172A" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

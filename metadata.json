@@ -1,0 +1,6 @@
+{
+  "name": "Basira",
+  "description": "A clean, sophisticated workspace designed for Basira.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
