@@ -257,6 +257,12 @@ export default function Query() {
               expectedKeys.forEach((key) => {
                 if (!(key in aliased)) aliased[key] = row["Count"];
               });
+              // Remove the original "Count" key once it's been copied under the
+              // chart-expected name(s), otherwise both show up as separate,
+              // identically-valued series (e.g. "Count" AND "Total Revenue"
+              // plotted side by side), which is confusing and looks like two
+              // different numbers when it's the same fallback count twice.
+              delete aliased["Count"];
               return aliased;
             });
           }

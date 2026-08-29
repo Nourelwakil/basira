@@ -5,6 +5,25 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
+
+/**
+ * Renders **bold** markdown-style markers as actual bold text instead of
+ * showing the literal asterisks. Gemini's generated insight text uses this
+ * syntax to highlight key figures/names, but the app previously displayed
+ * it as raw text (e.g. "**The Silent Patient**" instead of a bolded name).
+ * Deliberately minimal, only handles bold, not full markdown, since that's
+ * the only syntax the model actually uses in this field.
+ */
+function renderInsightText(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
 import {
   Lightbulb,
   Info,
@@ -508,7 +527,7 @@ export default function QueryResult({
               </h4>
             </div>
             <p className="font-sans text-xs text-amber-900 font-light leading-relaxed whitespace-pre-line select-text">
-              {insight}
+              {renderInsightText(insight)}
             </p>
           </div>
 
@@ -660,7 +679,7 @@ export default function QueryResult({
               <div className="p-4 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row gap-4 text-xs text-slate-600">
                 <div className="flex-1">
                   <span className="font-semibold text-slate-700 block mb-0.5">Key Insight:</span>
-                  <p className="line-clamp-2 text-slate-600">{insight}</p>
+                  <p className="line-clamp-2 text-slate-600">{renderInsightText(insight)}</p>
                 </div>
                 <div className="flex-1">
                   <span className="font-semibold text-slate-700 block mb-0.5">Selection Reasoning:</span>

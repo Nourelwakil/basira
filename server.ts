@@ -356,7 +356,7 @@ app.post("/api/query", async (req, res) => {
       "• Query: 'Show total revenue by month over time' -> chartType: 'line', groupBy: ['Order Date bucketed monthly'], aggregates: [{ outputColumn: 'Total Revenue', rawColumn: 'Revenue', type: 'sum' }], sort: { column: 'Order Date bucketed monthly', direction: 'asc' }, chartConfig: { xAxisKey: 'Order Date bucketed monthly', seriesKeys: ['Total Revenue'] }.\n" +
       "• Query: 'Show me the trend' or 'Revenue over time' -> chartType: 'line', groupBy: ['Order Date bucketed monthly'], aggregates: [{ outputColumn: 'Total Revenue', rawColumn: 'Revenue', type: 'sum' }], sort: { column: 'Order Date bucketed monthly', direction: 'asc' }, chartConfig: { xAxisKey: 'Order Date bucketed monthly', seriesKeys: ['Total Revenue'] }.\n" +
       "• Query: 'Compare total profit across all regions' -> Intent: Comparison -> 'bar', groupBy: ['Region'], aggregates: [{ outputColumn: 'Total Profit', rawColumn: 'Profit', type: 'sum' }].\n" +
-      "• Query: 'Show top 10 sub-categories by total sales' -> Intent: Ranking -> 'bar', groupBy: ['Sub-Category'], sort: { column: 'Total Sales', direction: 'desc' }, limit: 10.\n" +
+      "• Query: 'Show top 10 sub-categories by total sales' -> Intent: Ranking -> 'bar', groupBy: ['Sub-Category'], aggregates: [{ outputColumn: 'Total Sales', rawColumn: 'Sales', type: 'sum' }], sort: { column: 'Total Sales', direction: 'desc' }, limit: 10.\n" +
       "• Query: 'What percentage of total sales does each category represent?' -> Intent: Composition -> 'pie', groupBy: ['Category'].\n" +
       "• Query: 'Tell me about the discounts' -> Intent: Distribution -> 'histogram', valueKey: 'Discount', no groupBy.\n" +
       "• Query: 'Is there a correlation between discount and profit?' -> Intent: Correlation -> 'scatter', xAxisKey: 'Discount', yAxisKey: 'Profit', no groupBy.\n" +
@@ -407,6 +407,14 @@ app.post("/api/query", async (req, res) => {
             transformation: {
               type: Type.OBJECT,
               description: "Specs for client pipeline filtering, grouping, aggregating, and sorting.",
+              // aggregates is required so the model can't silently omit it the way
+              // it did for explicit "total sales"/"total revenue" style requests.
+              // This only forces the field to be present, not necessarily correct,
+              // but it closes the specific failure mode where the key is missing
+              // entirely, which previously fell straight through to a client-side
+              // row-count fallback even for queries with an unambiguous numeric
+              // column to sum.
+              required: ["aggregates"],
               properties: {
                 groupBy: { type: Type.ARRAY, items: { type: Type.STRING } },
                 aggregates: {
