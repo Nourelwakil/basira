@@ -234,6 +234,34 @@ export default function Query() {
         // 2. Perform client-side pipeline computation on raw csv records
         processed = processDataset(rawData, resultObj.transformation);
 
+        // Defensive alias: if the model omitted aggregates, processDataset falls
+        // back to a safe row count under the literal key "Count". But the model's
+        // chartConfig (seriesKeys/valueKey/yAxisKey) may reference a different
+        // name it assumed the aggregate would produce (e.g. "Total Sales") even
+        // though that aggregate was never actually computed. Without this, the
+        // chart silently renders empty bars because it's looking for a field
+        // that doesn't exist in the data. Copy the Count value under every name
+        // the chart config expects so the chart still displays correctly, even
+        // though the underlying number is a count, not the originally requested
+        // sum, since the aggregate itself was never generated.
+        const hasCountFallback = processed.length > 0 && Object.prototype.hasOwnProperty.call(processed[0], "Count") && !resultObj.transformation?.aggregates?.length;
+        if (hasCountFallback) {
+          const expectedKeys = [
+            ...(resultObj.chartConfig?.seriesKeys || []),
+            resultObj.chartConfig?.valueKey,
+            resultObj.chartConfig?.yAxisKey,
+          ].filter((k): k is string => !!k && k !== "Count");
+          if (expectedKeys.length > 0) {
+            processed = processed.map((row) => {
+              const aliased = { ...row };
+              expectedKeys.forEach((key) => {
+                if (!(key in aliased)) aliased[key] = row["Count"];
+              });
+              return aliased;
+            });
+          }
+        }
+
         const isFilterEmpty = resultObj.transformation?.filter && resultObj.transformation.filter.length > 0 && processed.length === 0;
 
         if (isFilterEmpty) {
