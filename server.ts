@@ -101,12 +101,20 @@ async function generateWithRetry(
   maxRetriesPerModel = 2
 ): Promise<any> {
   const primaryModel = params.model || "gemini-3.7-flash";
+  // gemini-2.5-pro is deprecated for new accounts (confirmed error: "no longer
+  // available to new users") and scheduled for full shutdown Oct 16, 2026, so it's
+  // removed entirely rather than left as a guaranteed-fail entry. gemini-3.1-pro-preview
+  // (Google's suggested replacement) has a long history of its own 503/504 instability
+  // and is a preview model, so it's skipped too. gemini-2.5-flash and flash-lite are
+  // GA (not preview), mature, and not yet deprecated, so they're tried first, then the
+  // newer 3.x flash generation, which is currently the least stable per recent reports.
   const candidateModels = [
-    primaryModel,
-    "gemini-3.7-flash",
-    "gemini-3.6-flash",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
     "gemini-3.5-flash",
-    "gemini-2.5-pro",
+    "gemini-3.6-flash",
+    "gemini-3.7-flash",
+    primaryModel,
   ].filter((m, i, arr) => !!m && arr.indexOf(m) === i);
 
   let lastError: any = null;
@@ -116,7 +124,13 @@ async function generateWithRetry(
     while (attempt <= maxRetriesPerModel) {
       try {
         const callParams = { ...params, model: modelName };
-        return await ai.models.generateContent(callParams);
+        const result = await ai.models.generateContent(callParams);
+        // Tag which model actually answered this request. Since the cascade can
+        // fall through several models depending on real-time availability, this
+        // is the only reliable way to know afterward which model produced a given
+        // result, important for evaluation runs where model consistency matters.
+        (result as any)._modelUsed = modelName;
+        return result;
       } catch (err: any) {
         lastError = err;
         const errMsg = err?.message || "";
@@ -456,6 +470,7 @@ app.post("/api/query", async (req, res) => {
     }
 
     const resultObj = JSON.parse(text.trim());
+    resultObj.modelUsed = (response as any)._modelUsed || "unknown";
     return res.json(resultObj);
   } catch (err: any) {
     return handleGeminiError(err, res, "An error occurred calling the Gemini intelligence server.");
@@ -553,6 +568,7 @@ app.post("/api/summarize", async (req, res) => {
     }
 
     const resultObj = JSON.parse(text.trim());
+    resultObj.modelUsed = (response as any)._modelUsed || "unknown";
     return res.json(resultObj);
   } catch (err: any) {
     return handleGeminiError(err, res, "An error occurred compiling dynamic summaries.");
