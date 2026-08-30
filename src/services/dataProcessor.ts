@@ -456,36 +456,49 @@ export function processDataset(
       });
     }
   } else if (hasAggregates && normalizedSchema.aggregates) {
-    const resultRow: Record<string, any> = {};
-    Object.entries(normalizedSchema.aggregates).forEach(([outColName, aggDef]) => {
-      const { column: rawColName, type: aggType } = aggDef;
+    // If every aggregate is type "none" (a raw pass-through column, used for
+    // correlation/distribution queries with no real aggregation), collapsing
+    // to a single summary row is wrong, that discards all but one row, which
+    // is exactly why correlation and distribution queries were returning a
+    // single meaningless data point instead of the full raw dataset. Treat
+    // this case the same as having no aggregates at all: return the raw rows
+    // untouched, only when aggregation is actually requested (at least one
+    // non-"none" type) does collapsing to a single summary row make sense.
+    const allNone = Object.values(normalizedSchema.aggregates).every((agg: any) => agg.type === "none");
+    if (allNone) {
+      // no-op: fall through with `processed` left as the raw row set
+    } else {
+      const resultRow: Record<string, any> = {};
+      Object.entries(normalizedSchema.aggregates).forEach(([outColName, aggDef]) => {
+        const { column: rawColName, type: aggType } = aggDef;
 
-      switch (aggType) {
-        case "sum":
-          resultRow[outColName] = Number(processed.reduce((sum, r) => sum + toNum(getFieldValue(r, rawColName)), 0).toFixed(2));
-          break;
-        case "avg":
-          const totalSum = processed.reduce((sum, r) => sum + toNum(getFieldValue(r, rawColName)), 0);
-          resultRow[outColName] = processed.length > 0 ? Number((totalSum / processed.length).toFixed(2)) : 0;
-          break;
-        case "count":
-          resultRow[outColName] = processed.length;
-          break;
-        case "min":
-          const valsMin = processed.map((r) => toNum(getFieldValue(r, rawColName)));
-          resultRow[outColName] = valsMin.length > 0 ? Math.min(...valsMin) : 0;
-          break;
-        case "max":
-          const valsMax = processed.map((r) => toNum(getFieldValue(r, rawColName)));
-          resultRow[outColName] = valsMax.length > 0 ? Math.max(...valsMax) : 0;
-          break;
-        case "none":
-        default:
-          resultRow[outColName] = getFieldValue(processed[0], rawColName) ?? null;
-          break;
-      }
-    });
-    processed = [resultRow];
+        switch (aggType) {
+          case "sum":
+            resultRow[outColName] = Number(processed.reduce((sum, r) => sum + toNum(getFieldValue(r, rawColName)), 0).toFixed(2));
+            break;
+          case "avg":
+            const totalSum = processed.reduce((sum, r) => sum + toNum(getFieldValue(r, rawColName)), 0);
+            resultRow[outColName] = processed.length > 0 ? Number((totalSum / processed.length).toFixed(2)) : 0;
+            break;
+          case "count":
+            resultRow[outColName] = processed.length;
+            break;
+          case "min":
+            const valsMin = processed.map((r) => toNum(getFieldValue(r, rawColName)));
+            resultRow[outColName] = valsMin.length > 0 ? Math.min(...valsMin) : 0;
+            break;
+          case "max":
+            const valsMax = processed.map((r) => toNum(getFieldValue(r, rawColName)));
+            resultRow[outColName] = valsMax.length > 0 ? Math.max(...valsMax) : 0;
+            break;
+          case "none":
+          default:
+            resultRow[outColName] = getFieldValue(processed[0], rawColName) ?? null;
+            break;
+        }
+      });
+      processed = [resultRow];
+    }
   }
 
   // 3. Sorting (with chronological date awareness)

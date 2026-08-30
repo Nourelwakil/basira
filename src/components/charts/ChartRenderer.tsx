@@ -158,12 +158,36 @@ export default function ChartRenderer({
   const finalValKey = valueKey || (finalSeriesKeys[0] || "");
   const finalCategoryKey = categoryKey || xAxisKey || detectedX;
 
+  // Safety cap independent of whatever (if any) limit the model specified.
+  // Bar charts with dozens of categories become unreadable tick-mark noise
+  // (this is what produced the 232-category chart), and pie charts are
+  // unreadable well before that. Rather than trust the model to always
+  // request a sensible limit, always sort by the primary value descending
+  // and cap category-based charts client-side, regardless of chart type
+  // requested or query wording. Line/area/scatter are left alone since they
+  // represent continuous data where many points are normal and expected.
+  const BAR_CHART_MAX_CATEGORIES = 20;
+  const PIE_CHART_MAX_CATEGORIES = 10;
+
+  const capCategoricalData = (rows: any[], sortKey: string, max: number) => {
+    if (!rows || rows.length <= max) return { rows, truncated: false, totalCount: rows?.length || 0 };
+    const sorted = [...rows].sort((a, b) => {
+      const av = typeof a[sortKey] === "number" ? a[sortKey] : parseFloat(a[sortKey]) || 0;
+      const bv = typeof b[sortKey] === "number" ? b[sortKey] : parseFloat(b[sortKey]) || 0;
+      return bv - av;
+    });
+    return { rows: sorted.slice(0, max), truncated: true, totalCount: rows.length };
+  };
+
+  const barCap = chartType === "bar" ? capCategoricalData(data, finalYKey, BAR_CHART_MAX_CATEGORIES) : null;
+  const pieCap = chartType === "pie" ? capCategoricalData(data, finalValKey, PIE_CHART_MAX_CATEGORIES) : null;
+
   const renderComponent = () => {
     switch (chartType) {
       case "bar":
         return (
           <AnimatedBarChart
-            data={data}
+            data={barCap!.rows}
             xAxisKey={finalXKey}
             seriesKeys={finalSeriesKeys}
             height={height}
@@ -181,7 +205,7 @@ export default function ChartRenderer({
       case "pie":
         return (
           <AnimatedPieChart
-            data={data}
+            data={pieCap!.rows}
             nameKey={finalCategoryKey}
             valueKey={finalValKey}
             height={height}
@@ -275,10 +299,17 @@ export default function ChartRenderer({
     }
   };
 
+  const activeCap = chartType === "bar" ? barCap : chartType === "pie" ? pieCap : null;
+
   return (
     <ChartErrorBoundary>
       <div className="w-full">
         {renderComponent()}
+        {activeCap?.truncated && (
+          <p className="text-[11px] text-basira-text-muted mt-2 text-center select-none">
+            Showing top {activeCap.rows.length} of {activeCap.totalCount} categories, sorted by value, for readability.
+          </p>
+        )}
       </div>
     </ChartErrorBoundary>
   );
