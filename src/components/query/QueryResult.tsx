@@ -3,8 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { toPng } from "html-to-image";
+import { useToast } from "../common/Toast";
 
 /**
  * Renders **bold** markdown-style markers as actual bold text instead of
@@ -63,6 +65,16 @@ export default function QueryResult({
   const [activeChartType, setActiveChartType] = useState<ChartType>(initialChartType);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const { showToast } = useToast();
+  // Two separate refs, not one: the normal-view chart and the fullscreen-modal
+  // chart can both be mounted in the DOM simultaneously (fullscreen renders a
+  // second ChartRenderer instance rather than replacing the first). Exporting
+  // via a global querySelector for ".recharts-responsive-container svg" would
+  // grab whichever one happens to appear first in the DOM, which is why PNG
+  // export previously behaved inconsistently between normal and fullscreen
+  // view. Each ref targets its own container explicitly instead.
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const fullscreenChartContainerRef = useRef<HTMLDivElement>(null);
 
   // Sync state if a new analysis query comes in
   useEffect(() => {
@@ -200,45 +212,48 @@ export default function QueryResult({
   };
 
   /**
-   * Action trigger: Serialize inline chart SVG element into downloadable raster PNG
+   * Action trigger: Export the full chart container (SVG chart + HTML legend,
+   * titles, and any other rendered elements) as a PNG.
+   *
+   * This replaces a previous implementation that serialized only the raw
+   * <svg> element found via a page-wide querySelector. That approach had
+   * three concrete problems, all reported as bugs: (1) Recharts renders its
+   * legend as an HTML <ul>, not inside the SVG, so legends were silently
+   * dropped from every export; (2) when the fullscreen modal is open, two
+   * ChartRenderer instances exist in the DOM at once (the original plus the
+   * modal's), and querySelector always grabbed whichever came first, not
+   * necessarily the one the user was actually looking at; (3) there was no
+   * onerror handler, so a failed image load produced no output and no
+   * feedback at all. Capturing the whole container element by ref, rather
+   * than the bare SVG by global selector, fixes all three at once.
    */
-  const handleExportPNG = () => {
+  const handleExportPNG = async () => {
+    const targetRef = isFullscreen ? fullscreenChartContainerRef : chartContainerRef;
+    const node = targetRef.current;
+
+    if (!node) {
+      showToast("Could not locate the chart to export. Try again after the chart finishes rendering.", "error");
+      return;
+    }
+
     try {
-      const svgElement = document.querySelector(".recharts-responsive-container svg");
-      if (!svgElement) {
-        alert("Active SVG chart container not found. Select data-table export to retrieve raw CSV instead.");
-        return;
-      }
+      const dataUrl = await toPng(node, {
+        backgroundColor: "#ffffff",
+        pixelRatio: 2, // retina-quality output
+        cacheBust: true,
+      });
 
-      const svgString = new XMLSerializer().serializeToString(svgElement);
-      const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-      const blobURL = URL.createObjectURL(svgBlob);
+      const downloadLink = document.createElement("a");
+      downloadLink.href = dataUrl;
+      downloadLink.download = `basira_analysis_${Date.now()}.png`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
 
-      const image = new Image();
-      image.onload = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = (svgElement.clientWidth || 600) * 2; // scale up for retina precision
-        canvas.height = (svgElement.clientHeight || 350) * 2;
-        const context = canvas.getContext("2d");
-
-        if (context) {
-          context.scale(2, 2);
-          context.fillStyle = "#ffffff";
-          context.fillRect(0, 0, svgElement.clientWidth || 600, svgElement.clientHeight || 350);
-          context.drawImage(image, 0, 0, svgElement.clientWidth || 600, svgElement.clientHeight || 350);
-
-          const pngUrl = canvas.toDataURL("image/png");
-          const downloadLink = document.createElement("a");
-          downloadLink.href = pngUrl;
-          downloadLink.download = `basira_analysis_${Date.now()}.png`;
-          document.body.appendChild(downloadLink);
-          downloadLink.click();
-          document.body.removeChild(downloadLink);
-        }
-      };
-      image.src = blobURL;
-    } catch {
-      alert("Error generating image file from SVG context. Fallback to Export Data.");
+      showToast("Chart downloaded successfully.", "success");
+    } catch (err) {
+      console.error("Chart PNG export failed:", err);
+      showToast("Couldn't export the chart as an image. Try Export Data (CSV) instead.", "error");
     }
   };
 
@@ -248,7 +263,14 @@ export default function QueryResult({
     (activeChartType as string) !== "none";
 
   // Calculate dynamic responsive height based on zoom level for complete visibility
-  const baseHeight = activeChartType === "scatter" ? 540 : activeChartType === "pie" ? 440 : 400;
+  // Heights increased from the previous 540/440/400 defaults, and vertical
+  // clipping removed below (overflow-y-hidden -> visible). The old fixed
+  // heights combined with overflow-y-hidden meant any chart whose legend,
+  // rotated axis labels, or title pushed it taller than the estimate was
+  // silently cropped rather than shown or scrolled, exactly the "chart not
+  // fully visible" issue reported. Charts with heavier label content will
+  // now grow into the visible extra space instead of being cut off.
+  const baseHeight = activeChartType === "scatter" ? 580 : activeChartType === "pie" ? 480 : 460;
   const currentHeight = Math.round(baseHeight * (zoomLevel / 100));
 
   if (isUnclear) {
@@ -492,10 +514,11 @@ export default function QueryResult({
 
           {/* Chart Rendering Container with Zoom Scrolling support */}
           <div
-            className="w-full relative overflow-x-auto overflow-y-hidden transition-all duration-200"
+            className="w-full relative overflow-x-auto overflow-y-visible transition-all duration-200"
             style={{ minHeight: `${currentHeight}px` }}
           >
             <div
+              ref={chartContainerRef}
               style={{
                 minWidth: zoomLevel > 100 ? `${zoomLevel}%` : "100%",
                 height: `${currentHeight}px`,
@@ -656,11 +679,12 @@ export default function QueryResult({
               {/* Modal Body - Oversized Chart Canvas with Zoom */}
               <div className="p-6 overflow-auto flex-1 bg-white">
                 <div
+                  ref={fullscreenChartContainerRef}
                   style={{
                     minWidth: zoomLevel > 100 ? `${zoomLevel}%` : "100%",
                     height: `${Math.max(520, Math.round(520 * (zoomLevel / 100)))}px`,
                   }}
-                  className="w-full flex items-center justify-center"
+                  className="w-full flex items-center justify-center bg-white"
                 >
                   <ChartRenderer
                     chartType={activeChartType}

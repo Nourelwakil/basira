@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useState } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence } from "motion/react";
 import { useAuth } from "./context/AuthContext";
@@ -13,11 +14,33 @@ import Upload from "./pages/Upload";
 import Query from "./pages/Query";
 import History from "./pages/History";
 import Settings from "./pages/Settings";
+import WelcomeScreen from "./components/common/WelcomeScreen";
 import { BrainCircuit } from "lucide-react";
+
+// Shown once per browser session (not on every reload) so returning users
+// mid-session aren't forced to sit through the animation repeatedly, while
+// a genuinely new visit (new tab/session) still gets the intro.
+const WELCOME_SEEN_KEY = "basira_welcome_seen";
 
 export default function App() {
   const location = useLocation();
   const { user, loading } = useAuth();
+  const [showWelcome, setShowWelcome] = useState(
+    () => !sessionStorage.getItem(WELCOME_SEEN_KEY)
+  );
+
+  const handleWelcomeFinished = () => {
+    sessionStorage.setItem(WELCOME_SEEN_KEY, "1");
+    setShowWelcome(false);
+  };
+
+  if (showWelcome) {
+    return (
+      <AnimatePresence>
+        <WelcomeScreen onFinished={handleWelcomeFinished} />
+      </AnimatePresence>
+    );
+  }
 
   // If Firebase Auth is checking initial session token
   if (loading) {

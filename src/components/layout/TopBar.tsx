@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Bell, HelpCircle, Cloud, CloudOff, LogOut, LogIn, UserPlus } from "lucide-react";
+import { Cloud, CloudOff, LogOut, LogIn, UserPlus } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useData } from "../../context/DataContext";
@@ -78,17 +78,11 @@ export default function TopBar() {
       </div>
 
       {/* Right Controls */}
+      {/* Help and Notification icons removed per design simplification.
+          Divider kept immediately before the account capsule so spacing
+          stays balanced rather than leaving a visual gap where the removed
+          icons used to sit. */}
       <div className="flex items-center gap-3">
-        {/* Support icons */}
-        <button className="p-2 text-basira-text-muted hover:text-basira-text-body hover:bg-basira-bg-surface rounded-lg transition-colors cursor-pointer">
-          <HelpCircle className="w-4 h-4" strokeWidth={1.5} />
-        </button>
-        <button className="p-2 text-basira-text-muted hover:text-basira-text-body hover:bg-basira-bg-surface rounded-lg transition-colors relative cursor-pointer">
-          <Bell className="w-4 h-4" strokeWidth={1.5} />
-          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#EF4444]" />
-        </button>
-
-        {/* Divider */}
         <div className="w-px h-5 bg-basira-border-default mx-1" />
 
         {/* User Account Capsule / Interactive Dropdown */}

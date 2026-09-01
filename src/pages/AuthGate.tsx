@@ -7,13 +7,9 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import {
   ShieldCheck,
-  BrainCircuit,
-  Database,
   Lock,
-  Sparkles,
   AlertCircle,
   Cloud,
-  Layers,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../components/common/Toast";
@@ -52,8 +48,8 @@ export default function AuthGate() {
       <div className="w-full max-w-md relative z-10 space-y-6">
         {/* Brand Logo & Header */}
         <div className="text-center space-y-2 select-none">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white shadow-xl shadow-blue-500/20 mb-2">
-            <BrainCircuit className="w-7 h-7" />
+          <div className="inline-flex items-center justify-center w-14 h-14 mb-2">
+            <img src="/logo-icon.png" alt="Basira" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white font-sans flex items-center justify-center gap-2">
             <span>Basira</span>
